@@ -60,6 +60,59 @@ import robomimic.utils.file_utils as FileUtils
 import robomimic.utils.env_utils as EnvUtils
 from robomimic.envs.env_base import EnvBase
 
+# ======================================================================================
+# Functions for inserting camera info into model XML string of premade robomimic datasets
+# ======================================================================================
+
+import re
+from textwrap import dedent
+from typing import Dict
+
+CAMERA_BLOCK = dedent("""
+    <camera mode="fixed" name="sideview2"        pos="0 -1.5 1.4879572214102434" quat="0.7933533 0.6087614 0 0"/>
+    <camera mode="fixed" name="backview"         pos="-1.5 0 1.45"               quat="-0.56 -0.43 0.43 0.56"/>
+    <camera mode="fixed" name="sideagentview"    pos="0 0.5 1.35"                quat="0 0 0.383 0.923"/>
+    <camera mode="fixed" name="fronttableview"   pos="0.8 0 1.2"                 quat="0.5608419 0.43064642 0.43064642 0.5608419"/>
+    <camera mode="fixed" name="sidetableview"    pos="0 0.8 1"                   quat="0.01071808 0.00552625 0.69142354 0.72234905"/>
+    <camera mode="fixed" name="squared0view"     pos="0.6 0.6 1"                 quat="0.28633323 0.26970193 0.63667727 0.6632619"/>
+    <camera mode="fixed" name="squared0viewfar"  pos="0.9 0.9 1.0"               quat="0.28633323 0.26970193 0.63667727 0.6632619"/>
+    <camera mode="fixed" name="squared0view2"    pos="0.6 -0.6 1"                quat="0.6714651 0.6409069 0.25949073 0.2665288"/>
+    <camera mode="fixed" name="squared0view2far" pos="0.9 -0.9 1"                quat="0.6714651 0.6409069 0.25949073 0.2665288"/>
+    <camera mode="fixed" name="squared0view3"    pos="-0.6 0.6 1"                quat="-0.2665288 -0.25949073 0.6409069 0.6714651"/>
+    <camera mode="fixed" name="squared0view3far" pos="-0.9 0.9 1"                quat="-0.2665288 -0.25949073 0.6409069 0.6714651"/>
+    <camera mode="fixed" name="squared0view4"    pos="-0.6 -0.6 1"               quat="0.6632619 0.63667727 -0.26970193 -0.28633323"/>
+    <camera mode="fixed" name="squared0view4far" pos="-0.9 -0.9 1"               quat="0.6632619 0.63667727 -0.26970193 -0.28633323"/>
+""").strip()
+
+def inject_after(src: str, anchor_pattern: str, payload: str) -> str:
+    """
+    Insert *payload* immediately after the first match of *anchor_pattern*
+    (a regular expression) inside *src*.  The anchor itself is preserved.
+    """
+    return re.sub(anchor_pattern,
+                  lambda m: m.group(0) + "\n" + payload,
+                  src,
+                  count=1,
+                  flags=re.DOTALL)
+
+
+def insert_camera_info(xml: Dict[str, str]) -> Dict[str, str]:
+    """
+    Adds the CAMERA_BLOCK right after the original side-view camera
+    in the MuJoCo XML stored under ``xml['model']``.
+    Mutates the dict in-place and returns it.
+    """
+    xml['model'] = inject_after(
+        xml['model'],
+        r'<camera[^>]*name="sideview"[^>]*/>',
+        CAMERA_BLOCK
+    )
+    return xml
+
+# ======================================================================================
+# Functions for inserting camera info into model XML string of premade robomimic datasets
+# ======================================================================================
+
 
 def extract_trajectory(
     env, 
@@ -89,6 +142,17 @@ def extract_trajectory(
 
     # load the initial state
     env.reset()
+    
+    # ======================================================================================
+    # line for inserting added camera info into model XML string
+    # ======================================================================================
+    
+    insert_camera_info(initial_state)
+    
+    # ======================================================================================
+    # line for inserting added camera info into model XML string
+    # ======================================================================================
+    
     obs = env.reset_to(initial_state)
 
     # maybe add in intrinsics and extrinsics for all cameras
